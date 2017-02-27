@@ -2,15 +2,20 @@
 
 from scapy.all import sr,sr1,IP,ICMP,UDP,TCP,traceroute
 
-import sys, getopt, random
+from pprint import pprint
+
+import sys, getopt, random, os
+
+filestring = ''
+outputToFile = False
 
 def printHelp():
 	print '****************************************************************'
 	print 'Welcome to Sean Jensen\'s Port Scanner!'
 	print '****************************************************************'
 	print '\nFEATURES'
-	print '  Port Scanning'
-	print '  Traceroute'
+	print '  This project allows a user to use command line switches to specify host and port for port scanning. It also allows more than one host and port to be specified for a single scan. The user can give as a parameter a text file containing the addresses/ports/protocols/timeouts, or can supply these on the command line. Hosts can be specified in a range of ways, as shown in the section ADDRESS SPECIFICATION below. This port scanner supports TCP, UDP, and ICMP pinging. It also allows the user to perform a traceroute to the specified hosts. The user can also output to a file, which can be opened up in any web browser.'
+	print '  KEY PHRASES: more than one host, read from text file, read from command line, different ways to specify, more than one port, TCP, ICMP, UDP, Tracefroute, HTML report'
 
 
 	print '\n\nADDRESS SPECIFICATION'
@@ -33,10 +38,13 @@ def printHelp():
 	print '  Base Usage: scanports.py -a <address> -p <port>'
 	print '  Additional Options:'
 	print '    --timeout=<timeout>, where <timeout> can be specified as either single, range, comma separated, or input file'
-	print '    --protocol=<protocol>, where <protocol> can be specified as either single, range, comma separated, or input file. Possible values are tcp, udp, icmp'
+	print '    --protocol=<protocol>, where <protocol> can be specified as either single, comma separated, or input file. Possible values are tcp, udp, icmp'
+	print '    --outfile=<outfile>, where <outfile> should be a html file where the output will be stored.'
 
 	print '\n\nTRACEROUTE USAGE'
 	print '  Base Usage: scanports.py -a <address> --traceroute'
+	print '  Additional Options:'
+	print '    --outfile=<outfile>, where <outfile> should be a html file where the output will be stored.'
 
 def ipToNum(octets):
 	return octets[0] + octets[1]*(2**8) + octets[2]*(2**16) + octets[3]*(2**24)
@@ -142,64 +150,107 @@ def sanitize(param):
 	return thisList
 
 def portscan(addressList, portList, protocolList, timeoutList):
+	global filestring
+	global outputToFile
 	for protocol in protocolList:
 		if protocol == 'tcp':	
 			for address in addressList:
 				for port in portList:
 					for timeout in timeoutList:
 						sport = random.randint(1,1024)
-						print "Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")"
+						if outputToFile == True:
+							filestring += "Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")"
+						else:
+							print "Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")"
 						resp = sr1(IP(dst=address)/TCP(sport=sport, dport=int(port), flags="S"), timeout=int(timeout))			#Sync
 						if str(type(resp)) == "<type 'NoneType'>" :
-							print "\tClosed"
+							if outputToFile == True:
+								filestring += "\tClosed"
+							else:
+								print "\tClosed"
 						elif resp.haslayer(TCP) :
 							if resp.getlayer(TCP).flags == 0x12:
 								rst = sr1(IP(dst=address)/TCP(sport=sport, dport=int(port), flags="AR"),timeout=int(timeout))	#Ack Req
-								print "\tOpen"
+								if outputToFile == True:
+									filestring += "\tOpen"
+								else:
+									print "\tOpen"
 							elif resp.getlayer(TCP).flags == 0x14:
-								print "\tClosed"
+								if outputToFile == True:
+									filestring += "\tClosed"
+								else:
+									print "\tClosed"
 		elif protocol == 'udp':
 			for address in addressList:
 				for port in portList:
 					for timeout in timeoutList:
-						print "Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")"
+						if outputToFile == True:
+							filestring += "Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")"
+						else:
+							print "Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")"
 						resp = sr1(IP(dst=address)/UDP(dport=int(port)), timeout=int(timeout))
 						if str(type(resp)) == "<type 'NoneType'>":
-							print "\tOpen|Filtered"
+							if outputToFile == True:
+								filestring += "\tOpen|Filtered"
+							else:
+								print "\tOpen|Filtered"
 						elif (resp.haslayer(UDP)):
-							return "\tOpen"
+							if outputToFile == True:
+								filestring += "\tOpen"
+							else:
+								return "\tOpen"
 						elif(resp.haslayer(ICMP)):
 							if(int(resp.getlayer(ICMP).type) == 3 and int(resp.getlayer(ICMP).code) == 3):
-								return "\tClosed"
+								if outputToFile == True:
+									filestring += "\tClosed"
+								else:
+									return "\tClosed"
 							elif(int(resp.getlayer(ICMP).type) == 3 and int(resp.getlayer(ICMP).code) in [1,2,9,10,13]):
-								return "\tFiltered"
+								if outputToFile == True:
+									filestring += "\tFiltered"
+								else:
+									return "\tFiltered"
 		elif protocol == 'icmp':
 			for address in addressList:
-				print "Sending ICMP packet to " + address
+				if outputToFile == True:
+					filestring += "Sending ICMP packet to " + address
+				else:
+					print "Sending ICMP packet to " + address
 				resp = sr1(IP(dst=address)/ICMP())
-				print resp
+				if outputToFile == True:
+					filestring += resp
+				else:
+					print resp
 
 def callTraceroute(addressList):
+	global filestring
+	global outputToFile
 	for address in addressList:
-		print "Traceroute to " + address
+		if outputToFile == True:
+			filestring += "Traceroute to " + address
+		else:
+			print "Traceroute to " + address
 		trace, _ = traceroute(address,verbose=0)
-		hosts = trace.get_trace().values()[0]
-		ips = [jpsts[i][0] for i in range(1, len(hosts) + 1)]
-		print hosts
-		#print ips
+		if outputToFile == True:
+			trace.show()
+		else:
+			trace.show()
 
 def main(argv):
+	global filestring
+	global outputToFile
 	address = None
 	port = None
 	protocol = None
 	timeout = None
 	tracert = False
+	outputFile = ''
 	addressList = []
 	portList = []
 	protocolList = ['tcp']
 	timeoutList = ['1']
 	try:
-		opts, args = getopt.getopt(argv,"ha:p:t",["address=","port=","protocol=","timeout=","traceroute"])
+		opts, args = getopt.getopt(argv,"ha:p:",["address=","port=","protocol=","timeout=","traceroute","outfile="])
 	except getopt.GetoptError:
 		print 'ERROR: USAGE scanports.py -a <address> -p <port>'
 		sys.exit(2)
@@ -219,19 +270,30 @@ def main(argv):
 		elif opt =="--timeout":
 			timeout = arg
 			timeoutList = sanitize(timeout)
-		elif opt in ("-t", "--traceroute"):
+		elif opt == "--traceroute":
 			tracert = True;
+		elif opt == "--outfile":
+			outputFile = arg
+			outputToFile = True
 		else:
 			assert False, "unhandled option"
 
+	if outputToFile == True:
+		filestring += '<html><title>scanports.py output</title><body>'
+
 	if tracert == True:
-		traceroute(addressList)
+		callTraceroute(addressList)
 	else:
 		#print "addressList " + str(addressList)
 		#print "portList " + str(portList)
 		#print "protocolList " + str(protocolList)
 		#print "timeoutList " + str(timeoutList)
 		portscan(addressList, portList, protocolList, timeoutList)
+		
+	if outputToFile == True:
+		filestring+= '</body></html>'
+		with open(outputFile, "w") as outfile:
+			outfile.write(filestring) 
 
 if __name__ == "__main__":
    main(sys.argv[1:])

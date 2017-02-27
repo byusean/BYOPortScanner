@@ -3,8 +3,8 @@ Dependencies:
 	2. Install scapy (I installed latest release here: http://scapy.readthedocs.io/en/latest/installation.html)
 	
 FEATURES
-  Port Scanning
-  Traceroute
+  This project allows a user to use command line switches to specify host and port for port scanning. It also allows more than one host and port to be specified for a single scan. The user can give as a parameter a text file containing the addresses/ports/protocols/timeouts, or can supply these on the command line. Hosts can be specified in a range of ways, as shown in the section ADDRESS SPECIFICATION below. This port scanner supports TCP, UDP, and ICMP pinging. It also allows the user to perform a traceroute to the specified hosts. The user can also output to a file, which can be opened up in any web browser.
+  KEY PHRASES: more than one host, read from text file, read from command line, different ways to specify, more than one port, TCP, ICMP, UDP, Tracefroute, HTML report
 
 
 ADDRESS SPECIFICATION
@@ -28,9 +28,12 @@ PORT SCANNING USAGE
   Base Usage: scanports.py -a <address> -p <port>
   Additional Options:
     --timeout=<timeout>, where <timeout> can be specified as either single, range, comma separated, or input file
-    --protocol=<protocol>, where <protocol> can be specified as either single, range, comma separated, or input file. Possible values are tcp, udp, icmp
+    --protocol=<protocol>, where <protocol> can be specified as either single, comma separated, or input file. Possible values are tcp, udp, icmp
+    --outfile=<outfile>, where <outfile> should be a html file where the output will be stored.
 
 
 TRACEROUTE USAGE
   Base Usage: scanports.py -a <address> --traceroute
+  Additional Options:
+    --outfile=<outfile>, where <outfile> should be a html file where the output will be stored.
 
