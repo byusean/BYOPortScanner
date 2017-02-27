@@ -1,8 +1,42 @@
 #!/usr/bin/python
 
-from scapy.all import sr,sr1,IP,ICMP,UDP,TCP,DNS,DNSQR
+from scapy.all import sr,sr1,IP,ICMP,UDP,TCP,traceroute
 
 import sys, getopt, random
+
+def printHelp():
+	print '****************************************************************'
+	print 'Welcome to Sean Jensen\'s Port Scanner!'
+	print '****************************************************************'
+	print '\nFEATURES'
+	print '  Port Scanning'
+	print '  Traceroute'
+
+
+	print '\n\nADDRESS SPECIFICATION'
+	print '  When you see the term <address>, it can take many forms.'
+	print '    e.g. 192.168.0.0 - single address'
+	print '    e.g. 192.168.0.0-192.168.0.255 - address range, this example specifies 256 addresses'
+	print '    e.g. 192.168.0.0,192.168.0.1 - comma separated, this example specifies 2 addresses'
+	print '    e.g. 192.168.0.0/24 - CIDR notation, this example specifies 256 addresses'
+	print '    e.g. addresses.txt - input file, this example will read in the text file, and look for input like the four examples above'
+
+
+	print '\n\nPORT SPECIFICATION'
+	print '  When you see the term <port>, it can take many forms.'
+	print '    e.g. 22 - single port'
+	print '    e.g. 1-1024 - port range, this example specifies 1024 ports'
+	print '    e.g. 22,139 - comma separated, this example specifies 2 ports'
+	print '    e.g. ports.txt - input file, this example will read in the text file, and look for input like the three examples above'
+
+	print '\n\nPORT SCANNING USAGE'
+	print '  Base Usage: scanports.py -a <address> -p <port>'
+	print '  Additional Options:'
+	print '    --timeout=<timeout>, where <timeout> can be specified as either single, range, comma separated, or input file'
+	print '    --protocol=<protocol>, where <protocol> can be specified as either single, range, comma separated, or input file. Possible values are tcp, udp, icmp'
+
+	print '\n\nTRACEROUTE USAGE'
+	print '  Base Usage: scanports.py -a <address> --traceroute'
 
 def ipToNum(octets):
 	return octets[0] + octets[1]*(2**8) + octets[2]*(2**16) + octets[3]*(2**24)
@@ -145,13 +179,14 @@ def portscan(addressList, portList, protocolList, timeoutList):
 				resp = sr1(IP(dst=address)/ICMP())
 				print resp
 
-def traceroute(addressList):
+def callTraceroute(addressList):
 	for address in addressList:
 		print "Traceroute to " + address
-		resp, unansw = sr(IP(dst="tar", ttl=(1,20))/UDP()/DNS(qd=DNSQR(address)))
-		resp.make_table(lambda (s,r): (s.dst, s.ttl, r.src))
-		# resp, unansw = sr(IP(dst=address, ttl=(1,20))/TCP(dport=53,flags="S"))
-		# ans.summary(lambda(s,r) : r.sprintf("%IP.src%\t{ICMP:%ICMP.type%}\t{TCP:%TCP.flags%}"))
+		trace, _ = traceroute(address,verbose=0)
+		hosts = trace.get_trace().values()[0]
+		ips = [jpsts[i][0] for i in range(1, len(hosts) + 1)]
+		print hosts
+		#print ips
 
 def main(argv):
 	address = None
@@ -161,17 +196,16 @@ def main(argv):
 	tracert = False
 	addressList = []
 	portList = []
-	protocolList = []
-	timeoutList = []
+	protocolList = ['tcp']
+	timeoutList = ['1']
 	try:
-		opts, args = getopt.getopt(argv,"ha:pt",["address=","port=","protocol=","timeout=","traceroute"])
+		opts, args = getopt.getopt(argv,"ha:p:t",["address=","port=","protocol=","timeout=","traceroute"])
 	except getopt.GetoptError:
 		print 'ERROR: USAGE scanports.py -a <address> -p <port>'
 		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '-h':
-			print 'scanports.py -a <address> -p <port> --protocol=<protocol> --timeout=<timeout>'
-			print 'scanports.py -a <address> --traceroute'
+			printHelp()
 			sys.exit()
 		elif opt in ("-a", "--address"):
 			address = arg
@@ -193,6 +227,10 @@ def main(argv):
 	if tracert == True:
 		traceroute(addressList)
 	else:
+		#print "addressList " + str(addressList)
+		#print "portList " + str(portList)
+		#print "protocolList " + str(protocolList)
+		#print "timeoutList " + str(timeoutList)
 		portscan(addressList, portList, protocolList, timeoutList)
 
 if __name__ == "__main__":
