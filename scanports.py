@@ -46,9 +46,11 @@ def printHelp():
 	print '  Additional Options:'
 	print '    --outfile=<outfile>, where <outfile> should be a html file where the output will be stored.'
 
+# This function converts an integer to four octets
 def ipToNum(octets):
 	return octets[0] + octets[1]*(2**8) + octets[2]*(2**16) + octets[3]*(2**24)
 
+# This function converts four octets to an integer
 def numToIP(num):
 	octets = []
 	octets.insert(0,num & 0x000000FF)
@@ -57,34 +59,34 @@ def numToIP(num):
 	octets.insert(3,(num & 0xFF000000) >> 24)
 	return octets
 
+# This function composes a list of ip addresses from a specification in CIDR notation
 def ipsFromCidr(octets, rasterbits):
 	ret = []
 	num = ipToNum(octets)
 	mask = 0xFFFFFFFF
 	mask &= 0xFFFFFFFF<<rasterbits
-	# print "{0:b}".format(mask)
 	for i in range(0,2**rasterbits):
 		ins = ''
 		retOctets = numToIP((num&mask)+i)
 		ins += str(retOctets[3]) + '.' + str(retOctets[2]) + '.' + str(retOctets[1]) + '.' + str(retOctets[0])
 		ret.insert(i,ins)
-	# print ret
 	return ret
 
+# This function aids in splitting comma separated values
 def handleCommaSeparated(param):
 	return param.split(',')
 
+# This function handles the mask and calls ipsFromCidr
 def handleCIDR(param):
 	ipaddr_s = param[:param.index('/')]
 	maskbits_i = int(param[param.index('/')+1:])
-	# print 'ip address is', ipaddr_s
-	# print 'maskbits is', maskbits_i
 	rasterbits = 32 - maskbits_i
 	octets = map(int, ipaddr_s.split('.'))
 	# we want the highest order bits to be in octets[3]
 	octets.reverse()
 	return ipsFromCidr(octets, rasterbits)
 
+# This function populates a list of values from a range
 def handleRange(param):
 	ret = []
 	# this is an IP address
@@ -93,6 +95,7 @@ def handleRange(param):
 		secondIPAddr_s = param[param.index('-')+1:]
 		firstIPAddr_o = map(int, firstIPAddr_s.split('.'))
 		secondIPAddr_o = map(int, secondIPAddr_s.split('.'))
+		# We reverse because we want the lowest ip address to be at the lowest index
 		firstIPAddr_o.reverse()
 		secondIPAddr_o.reverse()
 		firstIPAddr_i = ipToNum(firstIPAddr_o)
@@ -115,6 +118,7 @@ def handleRange(param):
 		print ret
 		return ret
 
+# Sanitize the user input
 def sanitize(param):
 	# if we are reading from a text file
 	if ".txt" in param:
@@ -153,81 +157,87 @@ def portscan(addressList, portList, protocolList, timeoutList):
 	global filestring
 	global outputToFile
 	for protocol in protocolList:
+		# using the TCP protocol
 		if protocol == 'tcp':	
 			for address in addressList:
 				for port in portList:
 					for timeout in timeoutList:
 						sport = random.randint(1,1024)
 						if outputToFile == True:
-							filestring += "Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")"
+							filestring += "<br>Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")<br>"
 						else:
 							print "Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")"
 						resp = sr1(IP(dst=address)/TCP(sport=sport, dport=int(port), flags="S"), timeout=int(timeout))			#Sync
 						if str(type(resp)) == "<type 'NoneType'>" :
 							if outputToFile == True:
-								filestring += "\tClosed"
+								filestring += "\tClosed<br>"
 							else:
 								print "\tClosed"
 						elif resp.haslayer(TCP) :
 							if resp.getlayer(TCP).flags == 0x12:
 								rst = sr1(IP(dst=address)/TCP(sport=sport, dport=int(port), flags="AR"),timeout=int(timeout))	#Ack Req
 								if outputToFile == True:
-									filestring += "\tOpen"
+									filestring += "\tOpen<br>"
 								else:
 									print "\tOpen"
 							elif resp.getlayer(TCP).flags == 0x14:
 								if outputToFile == True:
-									filestring += "\tClosed"
+									filestring += "\tClosed<br>"
 								else:
 									print "\tClosed"
+		
+		# using the UDP protocol
 		elif protocol == 'udp':
 			for address in addressList:
 				for port in portList:
 					for timeout in timeoutList:
 						if outputToFile == True:
-							filestring += "Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")"
+							filestring += "<br>Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")<br>"
 						else:
 							print "Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")"
 						resp = sr1(IP(dst=address)/UDP(dport=int(port)), timeout=int(timeout))
 						if str(type(resp)) == "<type 'NoneType'>":
 							if outputToFile == True:
-								filestring += "\tOpen|Filtered"
+								filestring += "\tOpen|Filtered<br>"
 							else:
 								print "\tOpen|Filtered"
 						elif (resp.haslayer(UDP)):
 							if outputToFile == True:
-								filestring += "\tOpen"
+								filestring += "\tOpen<br>"
 							else:
 								return "\tOpen"
 						elif(resp.haslayer(ICMP)):
 							if(int(resp.getlayer(ICMP).type) == 3 and int(resp.getlayer(ICMP).code) == 3):
 								if outputToFile == True:
-									filestring += "\tClosed"
+									filestring += "\tClosed<br>"
 								else:
 									return "\tClosed"
 							elif(int(resp.getlayer(ICMP).type) == 3 and int(resp.getlayer(ICMP).code) in [1,2,9,10,13]):
 								if outputToFile == True:
-									filestring += "\tFiltered"
+									filestring += "\tFiltered<br>"
 								else:
 									return "\tFiltered"
+		
+		# using the ICMP protocol
 		elif protocol == 'icmp':
 			for address in addressList:
 				if outputToFile == True:
-					filestring += "Sending ICMP packet to " + address
+					filestring += "<br>Sending ICMP packet to " + address + "<br>"
 				else:
 					print "Sending ICMP packet to " + address
 				resp = sr1(IP(dst=address)/ICMP())
 				if outputToFile == True:
-					filestring += resp
+					filestring += resp + "<br>"
 				else:
 					print resp
 
+# This function calls traceroute that is built into scapy
 def callTraceroute(addressList):
 	global filestring
 	global outputToFile
 	for address in addressList:
 		if outputToFile == True:
-			filestring += "Traceroute to " + address
+			filestring += "<br>Traceroute to " + address + "<br>"
 		else:
 			print "Traceroute to " + address
 		trace, _ = traceroute(address,verbose=0)
@@ -279,15 +289,11 @@ def main(argv):
 			assert False, "unhandled option"
 
 	if outputToFile == True:
-		filestring += '<html><title>scanports.py output</title><body>'
+		filestring += '<html><title>scanports.py output</title><body><h1>scanports.py output</h1>'
 
 	if tracert == True:
 		callTraceroute(addressList)
 	else:
-		#print "addressList " + str(addressList)
-		#print "portList " + str(portList)
-		#print "protocolList " + str(protocolList)
-		#print "timeoutList " + str(timeoutList)
 		portscan(addressList, portList, protocolList, timeoutList)
 		
 	if outputToFile == True:
