@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-from scapy.all import sr1,IP,ICMP,UDP
+from scapy.all import sr,sr1,IP,ICMP,UDP,TCP
 
-import sys, getopt
+import sys, getopt, random
 
 def ipToNum(octets):
 	return octets[0] + octets[1]*(2**8) + octets[2]*(2**16) + octets[3]*(2**24)
@@ -102,36 +102,82 @@ def sanitize(param):
 	if '-' in param:
 		return handleRange(param)
 
-def portscan(addressList, portList, protocolList, timeoutList):
+	# if it is a single
+	thisList = []
+	thisList.insert(0,param)
+	return thisList
 
+def portscan(addressList, portList, protocolList, timeoutList):
+	for protocol in protocolList:
+		if protocol == 'tcp':	
+			for address in addressList:
+				for port in portList:
+					for timeout in timeoutList:
+						sport = random.randint(1,1024)
+						print "Sending TCP packet to " + address + " on port " + port + " (timeout = " + timeout + ")"
+						resp = sr1(IP(dst=address)/TCP(sport=sport, dport=int(port), flags="S"), timeout=int(timeout))			#Sync
+						if str(type(resp)) == "<type 'NoneType'>" :
+							print "\tClosed"
+						elif resp.haslayer(TCP) :
+							if resp.getlayer(TCP).flags == 0x12:
+								rst = sr1(IP(dst=address)/TCP(sport=sport, dport=int(port), flags="AR"),timeout=int(timeout))	#Ack Req
+								print "\tOpen"
+							elif resp.getlayer(TCP).flags == 0x14:
+								print "\tClosed"
+		elif protocol == 'udp':
+			for address in addressList:
+				for port in portList:
+					for timeout in timeoutList:
+						print "Sending UDP packet to " + address + " on port " + port + "(timeout = " + timeout + ")"
+						resp = sr1(IP(dst=address)/UDP(dport=int(port)), timeout=int(timeout))
+						if str(type(resp)) == "<type 'NoneType'>":
+							print "\tOpen|Filtered"
+						elif (resp.haslayer(UDP)):
+							return "\tOpen"
+						elif(resp.haslayer(ICMP)):
+							if(int(resp.getlayer(ICMP).type) == 3 and int(resp.getlayer(ICMP).code) == 3):
+								return "\tClosed"
+							elif(int(resp.getlayer(ICMP).type) == 3 and int(resp.getlayer(ICMP).code) in [1,2,9,10,13]):
+								return "\tFiltered"
+		elif protocol == 'icmp':
+			for address in addressList:
+				print "Sending ICMP packet to " + address
+				resp = sr1(IP(dst=address)/ICMP())
+				print resp
 
 def main(argv):
-	address = ''
-	port = ''
-	protocol = 'tcp'
-	timeout = '10'
+	address = None
+	port = None
+	protocol = None
+	timeout = None
+	addressList = []
+	portList = []
+	protocolList = []
+	timeoutList = []
 	try:
-		opts, args = getopt.getopt(argv,"hta:p:",["address=","port=","protocol=","timeout="])
+		opts, args = getopt.getopt(argv,"ha:p",["address=","port=","protocol=","timeout="])
 	except getopt.GetoptError:
-		print 'scanports.py -a <address> -o <port>'
+		print 'ERROR: USAGE scanports.py -a <address> -p <port>'
 		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '-h':
-			print 'scanports.py -a <address> -o <port> --protocol=<protocol> --timeout=<timeout>'
+			print 'scanports.py -a <address> -p <port> --protocol=<protocol> --timeout=<timeout>'
 			sys.exit()
 		elif opt in ("-a", "--address"):
 			address = arg
+			addressList = sanitize(address)
 		elif opt in ("-p", "--port"):
 			port = arg
-		elif opt in ("--protocol"):
+			portList = sanitize(port)
+		elif opt == "--protocol":
 			protocol = arg
-		elif opt in ("-t", "--timeout"):
-			protocol = arg
+			protocolList = sanitize(protocol)
+		elif opt =="--timeout":
+			timeout = arg
+			timeoutList = sanitize(timeout)
+		else:
+			assert False, "unhandled option"
 
-	addressList = sanitize(address)
-	portList = sanitize(port)
-	protocolList = sanitize(protocol)
-	timeoutList = sanitize(timeout)
 
 	portscan(addressList, portList, protocolList, timeoutList)
 
