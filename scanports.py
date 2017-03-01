@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from scapy.all import sr,sr1,IP,ICMP,UDP,TCP
+from scapy.all import sr,sr1,IP,ICMP,UDP,TCP,DNS,DNSQR
 
 import sys, getopt, random
 
@@ -145,23 +145,33 @@ def portscan(addressList, portList, protocolList, timeoutList):
 				resp = sr1(IP(dst=address)/ICMP())
 				print resp
 
+def traceroute(addressList):
+	for address in addressList:
+		print "Traceroute to " + address
+		resp, unansw = sr(IP(dst="tar", ttl=(1,20))/UDP()/DNS(qd=DNSQR(address)))
+		resp.make_table(lambda (s,r): (s.dst, s.ttl, r.src))
+		# resp, unansw = sr(IP(dst=address, ttl=(1,20))/TCP(dport=53,flags="S"))
+		# ans.summary(lambda(s,r) : r.sprintf("%IP.src%\t{ICMP:%ICMP.type%}\t{TCP:%TCP.flags%}"))
+
 def main(argv):
 	address = None
 	port = None
 	protocol = None
 	timeout = None
+	tracert = False
 	addressList = []
 	portList = []
 	protocolList = []
 	timeoutList = []
 	try:
-		opts, args = getopt.getopt(argv,"ha:p",["address=","port=","protocol=","timeout="])
+		opts, args = getopt.getopt(argv,"ha:pt",["address=","port=","protocol=","timeout=","traceroute"])
 	except getopt.GetoptError:
 		print 'ERROR: USAGE scanports.py -a <address> -p <port>'
 		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '-h':
 			print 'scanports.py -a <address> -p <port> --protocol=<protocol> --timeout=<timeout>'
+			print 'scanports.py -a <address> --traceroute'
 			sys.exit()
 		elif opt in ("-a", "--address"):
 			address = arg
@@ -175,11 +185,15 @@ def main(argv):
 		elif opt =="--timeout":
 			timeout = arg
 			timeoutList = sanitize(timeout)
+		elif opt in ("-t", "--traceroute"):
+			tracert = True;
 		else:
 			assert False, "unhandled option"
 
-
-	portscan(addressList, portList, protocolList, timeoutList)
+	if tracert == True:
+		traceroute(addressList)
+	else:
+		portscan(addressList, portList, protocolList, timeoutList)
 
 if __name__ == "__main__":
    main(sys.argv[1:])
